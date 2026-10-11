@@ -1,4 +1,7 @@
-import pdfParse from 'pdf-parse' ;
+import {createRequire} from 'module';
+import { PDFParse } from 'pdf-parse';
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 
 export async function handlePdfExtraction(req, res){
     const chunks = [];
@@ -12,15 +15,18 @@ export async function handlePdfExtraction(req, res){
                 res.end(JSON.stringify({error:'Empty File Uploaded'}));
                 return;
             }
-            const data = await pdfParse(pdfBuffer);
+            parser = new PDFParse({data : pdfBuffer});
+            const result = await parser.getText();
+            
             res.writeHead(200,{'Content-Type':'application/json'});
             res.end(JSON.stringify({
-                numPages: data.numpages,
-                text: data.text
+                numPages: result.total,
+                text: result.text
             }))
         }catch(error){
+            console.error('PDF Parse Error Details',error)
             res.writeHead(500,{'Content-Type':'application/json'});
-            res.end(JSON.stringify({error:'Failed to extract text from PDF'}));
+            res.end(JSON.stringify({ error: error.message ||'Failed to extract text from PDF'}));
         }
 
     })
