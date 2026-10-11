@@ -9,6 +9,7 @@ export async function handlePdfExtraction(req, res){
 
     req.on('end', async () => {
         try{
+            let parser = null; 
             const pdfBuffer = Buffer.concat(chunks);
             if(pdfBuffer.length ===0){
                 res.writeHead(400,{'Content-Type':'applocation/json'});
@@ -27,6 +28,10 @@ export async function handlePdfExtraction(req, res){
             console.error('PDF Parse Error Details',error)
             res.writeHead(500,{'Content-Type':'application/json'});
             res.end(JSON.stringify({ error: error.message ||'Failed to extract text from PDF'}));
+        }finally{
+            if(parser){
+                await parser.destroy()
+            }
         }
 
     })
