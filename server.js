@@ -1,4 +1,4 @@
-// server.js - LuvTools Main Gateway Server
+// server.js - LuvTools Main Gateway Server (Updated with Drag & Drop)
 import http from 'http';
 import { URL } from 'url';
 import { handlePdfExtraction } from './tools/pdfExtractor.js';
@@ -29,7 +29,13 @@ const server = http.createServer(async (req, res) => {
                     .tool-panel.active { display: block; }
                     .card { background: #1e293b; border: 1px solid #334155; padding: 30px; border-radius: 8px; max-width: 700px; }
                     h2 { color: #38bdf8; margin-top: 0; }
-                    input[type="file"] { margin: 15px 0; color: #cbd5e1; }
+                    
+                    /* Drag & Drop Zone Styling */
+                    .drop-zone { border: 2px dashed #475569; padding: 30px; text-align: center; border-radius: 8px; cursor: pointer; margin: 20px 0; transition: all 0.2s ease; background: #0f172a; }
+                    .drop-zone.dragover { border-color: #38bdf8; background: #1e293b; }
+                    .drop-zone p { margin: 0; color: #94a3b8; }
+                    .file-name { margin-top: 10px; font-size: 13px; color: #34d399; font-weight: bold; }
+
                     button.action-btn { background: #38bdf8; color: #0f172a; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; border-radius: 4px; }
                     button.action-btn:hover { background: #0ea5e9; }
                     pre { background: #0f172a; border: 1px solid #334155; padding: 15px; max-height: 350px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; color: #34d399; margin-top: 20px; }
@@ -49,9 +55,15 @@ const server = http.createServer(async (req, res) => {
                     <div id="panel-pdf" class="tool-panel active">
                         <div class="card">
                             <h2>PDF Text Extractor</h2>
-                            <p>Extract raw text streams instantly from any uploaded PDF file.</p>
-                            <input type="file" id="pdfFile" accept=".pdf">
-                            <br>
+                            <p>Drag and drop a PDF file below or click to browse.</p>
+                            
+                            <!-- Drag & Drop Container -->
+                            <div id="dropZone" class="drop-zone">
+                                <p>📁 Drag & drop your PDF here, or <span style="color: #38bdf8; text-decoration: underline;">browse</span></p>
+                                <input type="file" id="pdfFile" accept=".pdf" style="display: none;">
+                                <div id="fileName" class="file-name"></div>
+                            </div>
+
                             <button class="action-btn" onclick="extractPdf()">Extract Text</button>
                             <pre id="pdfOutput">Extracted text will appear here...</pre>
                         </div>
@@ -83,23 +95,65 @@ const server = http.createServer(async (req, res) => {
                         document.getElementById('panel-' + toolId).classList.add('active');
                     }
 
+                    // Drag and Drop Logic
+                    const dropZone = document.getElementById('dropZone');
+                    const fileInput = document.getElementById('pdfFile');
+                    const fileNameDisplay = document.getElementById('fileName');
+                    let activeFile = null;
+
+                    dropZone.addEventListener('click', () => fileInput.click());
+
+                    fileInput.addEventListener('change', (e) => {
+                        if (e.target.files.length > 0) {
+                            activeFile = e.target.files[0];
+                            fileNameDisplay.innerText = \`Selected: \${activeFile.name}\`;
+                        }
+                    });
+
+                    ['dragenter', 'dragover'].forEach(eventName => {
+                        dropZone.addEventListener(eventName, (e) => {
+                            e.preventDefault();
+                            dropZone.classList.add('dragover');
+                        }, false);
+                    });
+
+                    ['dragleave', 'drop'].forEach(eventName => {
+                        dropZone.addEventListener(eventName, (e) => {
+                            e.preventDefault();
+                            dropZone.classList.remove('dragover');
+                        }, false);
+                    });
+
+                    dropZone.addEventListener('drop', (e) => {
+                        const dt = e.dataTransfer;
+                        const files = dt.files;
+                        if (files.length > 0) {
+                            activeFile = files[0];
+                            if (activeFile.type === 'application/pdf') {
+                                fileNameDisplay.innerText = \`Selected: \${activeFile.name}\`;
+                            } else {
+                                alert('Please drop a valid .pdf file.');
+                                activeFile = null;
+                                fileNameDisplay.innerText = '';
+                            }
+                        }
+                    });
+
                     async function extractPdf() {
-                        const fileInput = document.getElementById('pdfFile');
                         const output = document.getElementById('pdfOutput');
 
-                        if (fileInput.files.length === 0) {
-                            alert('Please select a PDF file first!');
+                        if (!activeFile) {
+                            alert('Please select or drop a PDF file first!');
                             return;
                         }
 
-                        const file = fileInput.files[0];
                         output.innerText = 'Extracting text streams... Please wait...';
 
                         try {
                             const response = await fetch('/api/pdf-extract', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/pdf' },
-                                body: file
+                                body: activeFile
                             });
 
                             const result = await response.json();
